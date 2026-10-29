@@ -1,0 +1,117 @@
+@if (!authenticated) {
+  <main class="auth-page">
+    <section class="auth-card">
+      <div class="auth-brand"><span class="brand-mark">OC</span><div><strong>OrderCraft</strong><small>Manufacturing order desk</small></div></div>
+      <div class="auth-heading"><p class="eyebrow">WORKSHOP MANAGEMENT</p><h1>{{ authMode === 'login' ? 'Welcome back' : 'Create your account' }}</h1><p>{{ authMode === 'login' ? 'Sign in to continue to your dashboard.' : 'Set up an account to start managing orders.' }}</p></div>
+      @if (notice) { <div class="notice" role="status">{{ notice }}</div> }
+      <form class="auth-form" (ngSubmit)="submitAuth()">
+        @if (authMode === 'signup') { <label>Full name<input name="fullName" [(ngModel)]="authForm.fullName" required maxlength="120" placeholder="Your name"></label> }
+        <label>Email address<input name="authEmail" type="email" [(ngModel)]="authForm.email" required maxlength="160" autocomplete="email" placeholder="name@example.com"></label>
+        <label>Password<input name="authPassword" type="password" [(ngModel)]="authForm.password" required minlength="8" maxlength="72" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" placeholder="At least 8 characters"></label>
+        @if (authMode === 'signup') { <label>Confirm password<input name="confirmPassword" type="password" [(ngModel)]="authForm.confirmPassword" required minlength="8" maxlength="72" autocomplete="new-password" placeholder="Enter password again"></label> }
+        <button class="primary-button auth-submit" type="submit">{{ authMode === 'login' ? 'Sign in' : 'Create account' }}</button>
+      </form>
+      @if (authMode === 'signup') { <p class="first-user-note">The first account is an Admin. New accounts after that are Staff.</p> }
+      <p class="auth-switch">{{ authMode === 'login' ? 'New to OrderCraft?' : 'Already have an account?' }} <button type="button" (click)="setAuthMode(authMode === 'login' ? 'signup' : 'login')">{{ authMode === 'login' ? 'Sign up' : 'Sign in' }}</button></p>
+    </section>
+  </main>
+} @else {
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">OC</span><div><strong>OrderCraft</strong><small>Manufacturing desk</small></div></div>
+    <nav aria-label="Main navigation">
+      @for (item of menu; track item) {
+        @if (item !== 'Users' || isAdmin) {
+          <button class="nav-item" [class.active]="section === item" (click)="open(item)">
+            <span class="nav-dot"></span>{{ item }}
+          </button>
+        }
+      }
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span> Signed in as {{ authUser?.role }}</div>
+  </aside>
+
+  <main class="main-area">
+    <header class="page-header">
+      <div><p class="eyebrow">ORDERCRAFT <span>/</span> {{ section.toUpperCase() }}</p><h1>{{ section }}</h1></div>
+      <div class="account-area"><span class="header-note">{{ authUser?.fullName }} · {{ authUser?.role }}</span><button class="secondary-button sign-out" (click)="logout()">Sign out</button></div>
+    </header>
+
+    @if (notice) { <div class="notice" role="status">{{ notice }}</div> }
+
+    @if (section === 'Dashboard') {
+      <section class="welcome-row"><div><h2>Good day, {{ authUser?.fullName }}</h2><p>Here is the current overview of your workshop.</p></div><span class="date-chip">Production overview</span></section>
+      <section class="stat-grid">
+        <article class="stat-card"><span class="stat-label">CUSTOMERS</span><strong>{{ customers.length }}</strong><small>Customers on file</small></article>
+        <article class="stat-card"><span class="stat-label">PRODUCTS</span><strong>{{ products.length }}</strong><small>Products configured</small></article>
+        <article class="stat-card"><span class="stat-label">OPEN ORDERS</span><strong>{{ openOrders }}</strong><small>Awaiting completion</small></article>
+        <article class="stat-card"><span class="stat-label">LOW STOCK</span><strong>{{ lowStockCount }}</strong><small>Materials at reorder level</small></article>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Recent orders</h2><p>Latest customer orders and their progress</p></div><button class="text-button" (click)="open('Orders')">View orders →</button></div>
+        @if (orders.length) {
+          <div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th><th>Delivery</th><th>Status</th></tr></thead><tbody>
+            @for (order of orders.slice(0, 5); track order.id) { <tr><td>#{{ order.id }}</td><td>{{ order.customer.name }}</td><td>{{ order.product.name }}</td><td>{{ order.quantity }}</td><td>{{ order.deliveryDate ? (order.deliveryDate | date:'dd/MM/yyyy') : '—' }}</td><td><span class="badge" [class]="'badge ' + badgeClass(order.status)">{{ pretty(order.status) }}</span></td></tr> }
+          </tbody></table></div>
+        } @else { <div class="empty-state">No orders yet. Add a customer and product, then create your first order.</div> }
+      </section>
+    }
+
+    @if (section === 'Customers') {
+      <section class="panel"><div class="panel-heading"><div><h2>{{ editingCustomerId === null ? 'Add a customer' : 'Edit customer' }}</h2><p>Keep customer contact details in one place.</p></div></div>
+        <form class="form-grid" (ngSubmit)="addCustomer()"><label>Name<input name="customerName" [(ngModel)]="customerForm.name" required placeholder="Customer name"></label><label>Email<input name="customerEmail" type="email" [(ngModel)]="customerForm.email" required placeholder="name@example.com"></label><label>Phone<input name="customerPhone" type="tel" [(ngModel)]="customerForm.phone" pattern="(?:\+91[ -]?)?[6-9][0-9]{9}" title="Enter a 10-digit Indian mobile number, optionally with +91" placeholder="+91 98765 43210"></label><label>Address<input name="customerAddress" [(ngModel)]="customerForm.address" placeholder="City or address"></label><div class="form-actions"><button class="primary-button" type="submit">{{ editingCustomerId === null ? 'Add customer' : 'Save changes' }}</button>@if (editingCustomerId !== null) { <button class="secondary-button" type="button" (click)="cancelCustomerEdit()">Cancel</button> }</div></form>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Customer list</h2><p>{{ customers.length }} customers</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead><tbody>@for (customer of customers; track customer.id) { <tr><td>{{ customer.name }}</td><td>{{ customer.email }}</td><td>{{ customer.phone || '—' }}</td><td>{{ customer.address || '—' }}</td><td class="actions"><button class="small-button" (click)="editCustomer(customer)">Edit</button> @if (isAdmin) { <button class="small-button delete-button" (click)="deleteCustomer(customer)">Delete</button> }</td></tr> }</tbody></table>
+        @if (!customers.length) { <div class="empty-state">No customers added yet.</div> }</div>
+      </section>
+    }
+
+    @if (section === 'Products') {
+      <section class="panel"><div class="panel-heading"><div><h2>{{ editingProductId === null ? 'Add a product' : 'Edit product' }}</h2><p>Set the products your workshop makes.</p></div></div>
+        <form class="form-grid" (ngSubmit)="addProduct()"><label>Product name<input name="productName" [(ngModel)]="productForm.name" required placeholder="e.g. Wooden chair"></label><label>Description<input name="productDescription" [(ngModel)]="productForm.description" placeholder="Short description"></label><label>Unit price (₹)<input name="unitPrice" type="number" min="0" step="0.01" [(ngModel)]="productForm.unitPrice" required></label><label>Finished stock<input name="finishedStock" type="number" min="0" [(ngModel)]="productForm.stockQuantity" required></label><div class="form-actions"><button class="primary-button" type="submit">{{ editingProductId === null ? 'Add product' : 'Save changes' }}</button>@if (editingProductId !== null) { <button class="secondary-button" type="button" (click)="cancelProductEdit()">Cancel</button> }</div></form>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Product list</h2><p>{{ products.length }} products</p></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Description</th><th>Unit price</th><th>Finished stock</th><th>Actions</th></tr></thead><tbody>@for (product of products; track product.id) { <tr><td>{{ product.name }}</td><td>{{ product.description || '—' }}</td><td>{{ product.unitPrice | currency:'INR':'symbol':'1.2-2':'en-IN' }}</td><td>{{ product.stockQuantity }}</td><td class="actions"><button class="small-button" (click)="editProduct(product)">Edit</button> @if (isAdmin) { <button class="small-button delete-button" (click)="deleteProduct(product)">Delete</button> }</td></tr> }</tbody></table>@if (!products.length) { <div class="empty-state">No products added yet.</div> }</div></section>
+    }
+
+    @if (section === 'Materials') {
+      <section class="panel"><div class="panel-heading"><div><h2>{{ editingMaterialId === null ? 'Add a raw material' : 'Edit raw material' }}</h2><p>Track the materials used to make your products.</p></div></div>
+        <form class="form-grid" (ngSubmit)="addMaterial()"><label>Material name<input name="materialName" [(ngModel)]="materialForm.name" required placeholder="e.g. Teak wood"></label><label>Unit<input name="materialUnit" [(ngModel)]="materialForm.unit" required placeholder="pcs, kg, m"></label><label>Available quantity<input name="materialStock" type="number" min="0" step="0.001" [(ngModel)]="materialForm.stockQuantity" required></label><label>Reorder level<input name="reorderLevel" type="number" min="0" step="0.001" [(ngModel)]="materialForm.reorderLevel" required></label><div class="form-actions"><button class="primary-button" type="submit">{{ editingMaterialId === null ? 'Add material' : 'Save changes' }}</button>@if (editingMaterialId !== null) { <button class="secondary-button" type="button" (click)="cancelMaterialEdit()">Cancel</button> }</div></form>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Material stock</h2><p>Stock is reduced when an order moves into production.</p></div></div><div class="table-wrap"><table><thead><tr><th>Material</th><th>Unit</th><th>Available</th><th>Reorder level</th><th>Stock note</th><th>Actions</th></tr></thead><tbody>@for (material of materials; track material.id) { <tr><td>{{ material.name }}</td><td>{{ material.unit }}</td><td>{{ material.stockQuantity }}</td><td>{{ material.reorderLevel }}</td><td>@if (material.stockQuantity <= material.reorderLevel) { <span class="badge badge-warn">Reorder</span> } @else { <span class="badge badge-good">In stock</span> }</td><td class="actions"><button class="small-button" (click)="editMaterial(material)">Edit</button> @if (isAdmin) { <button class="small-button delete-button" (click)="deleteMaterial(material)">Delete</button> }</td></tr> }</tbody></table>@if (!materials.length) { <div class="empty-state">No materials added yet.</div> }</div></section>
+    }
+
+    @if (section === 'Bill of materials') {
+      <section class="panel"><div class="panel-heading"><div><h2>Product bill of materials</h2><p>Set the material quantity needed to make one unit.</p></div></div>
+        <form class="form-grid" (ngSubmit)="addBomItem()"><label>Product<select name="bomProduct" [(ngModel)]="bomForm.productId" (ngModelChange)="loadBom($event)" required><option [ngValue]="0" disabled>Select product</option>@for (product of products; track product.id) { <option [ngValue]="product.id">{{ product.name }}</option> }</select></label><label>Raw material<select name="bomMaterial" [(ngModel)]="bomForm.materialId" required><option [ngValue]="0" disabled>Select material</option>@for (material of materials; track material.id) { <option [ngValue]="material.id">{{ material.name }} ({{ material.unit }})</option> }</select></label><label>Quantity per product<input name="quantityPerProduct" type="number" min="0.001" step="0.001" [(ngModel)]="bomForm.quantityPerProduct" required></label><button class="primary-button" type="submit">Add BOM item</button></form>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Materials for selected product</h2><p>Choose a product above to see its BOM.</p></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Material</th><th>Qty per unit</th><th>Unit</th></tr></thead><tbody>@for (item of bomItems; track item.id) { <tr><td>{{ item.product.name }}</td><td>{{ item.material.name }}</td><td>{{ item.quantityPerProduct }}</td><td>{{ item.material.unit }}</td></tr> }</tbody></table>@if (!bomItems.length) { <div class="empty-state">No bill-of-material items for this product yet.</div> }</div></section>
+    }
+
+    @if (section === 'Orders') {
+      <section class="panel"><div class="panel-heading"><div><h2>Create a manufacturing order</h2><p>Create the customer order, then check material stock.</p></div></div>
+        <form class="form-grid" (ngSubmit)="addOrder()"><label>Customer<select name="orderCustomer" [(ngModel)]="orderForm.customerId" required><option [ngValue]="0" disabled>Select customer</option>@for (customer of customers; track customer.id) { <option [ngValue]="customer.id">{{ customer.name }}</option> }</select></label><label>Product<select name="orderProduct" [(ngModel)]="orderForm.productId" required><option [ngValue]="0" disabled>Select product</option>@for (product of products; track product.id) { <option [ngValue]="product.id">{{ product.name }}</option> }</select></label><label>Quantity<input name="orderQuantity" type="number" min="1" [(ngModel)]="orderForm.quantity" required></label><label>Delivery date<input name="deliveryDate" type="date" [(ngModel)]="orderForm.deliveryDate"></label><button class="primary-button" type="submit">Create order</button></form>
+      </section>
+      <section class="panel"><div class="panel-heading"><div><h2>Order queue</h2><p>Use “Check materials” to calculate shortages or start production.</p></div></div><div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th><th>Delivery</th><th>Status</th><th>Action</th></tr></thead><tbody>@for (order of orders; track order.id) { <tr><td>#{{ order.id }}</td><td>{{ order.customer.name }}</td><td>{{ order.product.name }}</td><td>{{ order.quantity }}</td><td>{{ order.deliveryDate ? (order.deliveryDate | date:'dd/MM/yyyy') : '—' }}</td><td><span class="badge" [class]="'badge ' + badgeClass(order.status)">{{ pretty(order.status) }}</span></td><td class="actions">@if (order.status === 'PENDING' || order.status === 'MATERIALS_REQUIRED') { <button class="small-button" (click)="checkMaterials(order)">{{ order.status === 'PENDING' ? 'Check materials' : 'Check again' }}</button> } @if (order.status === 'IN_PRODUCTION') { <button class="small-button" (click)="moveOrder(order, 'READY')">Mark ready</button> } @if (order.status === 'READY') { <button class="small-button" (click)="moveOrder(order, 'COMPLETED')">Complete</button> } @if (order.status === 'COMPLETED' && !hasInvoice(order.id)) { <button class="small-button" (click)="makeInvoice(order)">Create invoice</button> }</td></tr> }</tbody></table>@if (!orders.length) { <div class="empty-state">No orders yet.</div> }</div></section>
+    }
+
+    @if (section === 'Purchase orders') {
+      <section class="panel"><div class="panel-heading"><div><h2>Order materials from a supplier</h2><p>Record a purchase order when stock is short.</p></div></div><form class="form-grid" (ngSubmit)="addPurchaseOrder()"><label>Material<select name="purchaseMaterial" [(ngModel)]="purchaseForm.materialId" required><option [ngValue]="0" disabled>Select material</option>@for (material of materials; track material.id) { <option [ngValue]="material.id">{{ material.name }} ({{ material.unit }})</option> }</select></label><label>Quantity<input name="purchaseQuantity" type="number" min="0.001" step="0.001" [(ngModel)]="purchaseForm.quantity" required></label><label>Supplier<input name="supplierName" [(ngModel)]="purchaseForm.supplierName" placeholder="Supplier name"></label><button class="primary-button" type="submit">Create purchase order</button></form></section>
+      <section class="panel"><div class="panel-heading"><div><h2>Purchase orders</h2><p>Receive an order to add its quantity to raw-material stock.</p></div></div><div class="table-wrap"><table><thead><tr><th>PO</th><th>Material</th><th>Quantity</th><th>Supplier</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>@for (purchase of purchaseOrders; track purchase.id) { <tr><td>#{{ purchase.id }}</td><td>{{ purchase.material.name }}</td><td>{{ purchase.quantity }} {{ purchase.material.unit }}</td><td>{{ purchase.supplierName || '—' }}</td><td>{{ purchase.orderDate | date:'dd/MM/yyyy' }}</td><td><span class="badge" [class]="'badge ' + badgeClass(purchase.status)">{{ pretty(purchase.status) }}</span></td><td>@if (purchase.status === 'OPEN') { <button class="small-button" (click)="receivePurchaseOrder(purchase)">Mark received</button> }</td></tr> }</tbody></table>@if (!purchaseOrders.length) { <div class="empty-state">No purchase orders yet.</div> }</div></section>
+    }
+
+    @if (section === 'Invoices') {
+      <section class="panel"><div class="panel-heading"><div><h2>Invoices and payments</h2><p>Create invoices for completed orders and record customer payments.</p></div></div><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Order</th><th>Customer</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>@for (invoice of invoices; track invoice.id) { <tr><td>#{{ invoice.id }}</td><td>#{{ invoice.order.id }}</td><td>{{ invoice.order.customer.name }}</td><td>{{ invoice.totalAmount | currency:'INR':'symbol':'1.2-2':'en-IN' }}</td><td>{{ invoice.invoiceDate | date:'dd/MM/yyyy' }}</td><td><span class="badge" [class]="'badge ' + badgeClass(invoice.status)">{{ pretty(invoice.status) }}</span></td><td>@if (invoice.status === 'PENDING') { <button class="small-button" (click)="markPaid(invoice)">Record payment</button> }</td></tr> }</tbody></table>@if (!invoices.length) { <div class="empty-state">Invoices appear here after an order is completed.</div> }</div></section>
+    }
+
+    @if (section === 'Users' && isAdmin) {
+      <section class="panel"><div class="panel-heading"><div><h2>Accounts</h2><p>People who can sign in to this workshop.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody>@for (user of adminUsers; track user.id) { <tr><td>{{ user.fullName }}</td><td>{{ user.email }}</td><td><span class="badge" [class]="'badge ' + (user.role === 'ADMIN' ? 'badge-blue' : 'badge-muted')">{{ pretty(user.role) }}</span></td></tr> }</tbody></table>@if (!adminUsers.length) { <div class="empty-state">No accounts found.</div> }</div>
+      </section>
+    }
+
+    <footer class="page-footer">OrderCraft · Workshop order management</footer>
+  </main>
+</div>
+}
+
+

@@ -1,0 +1,15 @@
+# Java / Maven
+backend/target/
+*.class
+
+# Angular / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Local IDE and environment files
+.idea/
+.vscode/
+*.iml
+.env
+application-local.properties
